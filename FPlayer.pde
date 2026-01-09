@@ -1,5 +1,62 @@
 //Mario Game 
 
+//Some problems (1.7 after add terrains):
+/*
+1) Portal X Work anymore, redeem it
+2) Dead pink skull gone+X work anymore, redeem it
+3) Tree center image should not be needed because the tree mid is enough, so instead of 5 pixels, 4 pixels enough (T shape), delete
+png named "treetop_center"
+4) How to set friction higher than default for ground.png and if it is already relatively high compared to ice then
+->no need to change anything
+5) The requirements are "a trampoline has higher restitution", what does that mean and am I already doing it?
+6) Fancy Terrain will require a new class that extends FBox, and all the Fancy Terrain objects will need to
+be put into an arrayList and processed by a loop. :
+This includes 2 things:
+1. (Right now, write this code for me) Collapsing Bridge: This simulates the classic platform that falls when the player jumps on it. 
+When the player touches a collapsing bridge, it sets its static property to false, and therefore it falls.
+-> I am using the color #cba3e9 to represent this 3 pixel set of bridges (there can be multiple sets, but all will be multiples
+of 3 pixels so it looks complete, repeat same pattern order)
+-> load those pictures of rails that do not collide with players on top of the bridges in the pattern of 3 pngs as well
+-> the color i use to represent the rails that you should detect are #
+-> names of those are from left to right: "bridgeRails_e.png", "bridgeRails_center.png", "bridgeRails_w.png".
+-> The png pictures that your should load are in the below names in the order of from left to right:
+-> "bridge_e.png", "bridge_center.png", "bridge_w.png".
+-> here is demo code of what my friend used to do the bridges:
+"class FBridge extends FGameobject {
+FHammerBro
+FBridge (float x, float y) {
+super ();
+setPosition(X, y) ; setName ("bridge");
+attachImage (bridgeCenter);
+setstatic (true);
+FLava
+FPlayer
+FThwomp
+void act) {
+if (isTouching ("player")) (
+setStatic(false);
+setSensor (true);
+}}}"
+-> End here.
+
+2. (I already have this, but not sure if it matches the requirements)
+Lava: Lava is a kind of animated block - it should cycle through a particular set of images 
+(perhaps stored in a global array), attaching the images sequentially over time to create the bubbling lava animation. 
+Make each lava block start at a random index in the array so as to offset the animations. 
+Lava is dangerous terrain, regardless of the current image attached.
+
+More Problems (1.8 detected):
+Basic Terrain does not require a new class nor does it have any unique code; 
+it is just a standard FBox with specific properties set. 
+For all properties, be sure to use setName() to make collision detection easy in the future.
+
+i want to finish all terrains first
+
+Idea (New):
+1) Dirt boxes that are sideways/upside down can be used for level 2/3 if i want player to move in anti-gravity way
+
+*/
+
 //character selection 
 /*
 select the button
