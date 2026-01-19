@@ -1,3 +1,5 @@
+//switch
+
 class Level {
   int id;
   boolean cleared = false;
@@ -17,17 +19,17 @@ class Level {
   final int TILE_TREE = 11;
   final int TILE_WATER = 12;
 
-  final int TILE_BRIDGE = 13;
+  final int TILE_BRIDGE = 13; // collapsing bridge
 
   int[][] tiles;
+  int[][] originalTiles;   // ✅ NEW: backup of the original tiles (so bridges can reset)
+
   int mapW, mapH;
   int tileSize = 32;
 
-  // ===== SPAWN / CHECKPOINT =====
+  // ===== SPAWN =====
   float spawnX = 50;
   float spawnY = 50;
-
-  // World coords of active checkpoint (top-left of the checkpoint tile)
   float checkpointX = -1;
   float checkpointY = -1;
 
@@ -57,25 +59,25 @@ class Level {
   final color C_TREE = color(0xFF36FC8F);
   final color C_WATER = color(0xFF2F3E99);
 
-  final color C_BRIDGE = color(0xFFCBA3E9);
+  final color C_BRIDGE = color(0xFFCBA3E9); // collapsing bridge
 
   // ===== IMAGES =====
-  PImage groundTile, portalTile, goalTile;
-
-  // Checkpoint two-state images
-  PImage checkpoint0Img, checkpoint1Img;
-
+  PImage groundTile, portalTile, goalTile, checkpointTile;
   PImage trampolineImg, iceImg, spikeImg;
 
+  // lava + water animation
   PImage[] lavaFrames = new PImage[6];
   PImage[] waterFrames = new PImage[4];
   int lavaFrame = 0, waterFrame = 0, animTimer = 0;
 
+  // tree pieces
   PImage treeTrunk, treeMid, treeTL, treeTC, treeTR;
 
+  // bridge pieces + rails (decor)
   PImage bridgeE, bridgeC, bridgeW;
   PImage railE, railC, railW;
 
+  // collapsing state arrays
   boolean[][] bridgeTriggered;
   int[][] bridgeTimer;
 
@@ -83,29 +85,36 @@ class Level {
     this.id = id;
 
     PImage img = loadImage("map" + id + ".png");
-    loadMapFromImage(img);
+    loadMapFromImage(img);   // ✅ this now also creates originalTiles backup
 
+    // base tiles
     groundTile = loadImage("ground.png");
     portalTile = loadImage("portal.png");
     goalTile = loadImage("goal.png");
+    checkpointTile = loadImage("checkpoint.png");
 
-    // Two checkpoint images
-    checkpoint0Img = loadImage("checkpoint0.png");
-    checkpoint1Img = loadImage("checkpoint1.png");
-
+    // terrain tiles
     trampolineImg = loadImage("trampoline.png");
     iceImg = loadImage("ice.png");
     spikeImg = loadImage("spike.png");
 
-    for (int i = 0; i < 6; i++) lavaFrames[i] = loadImage("lava" + (i + 1) + ".png");
-    for (int i = 0; i < 4; i++) waterFrames[i] = loadImage("water" + (i + 1) + ".png");
+    // lava frames
+    for (int i = 0; i < 6; i++) {
+      lavaFrames[i] = loadImage("lava" + (i + 1) + ".png");
+    }
+    // water frames
+    for (int i = 0; i < 4; i++) {
+      waterFrames[i] = loadImage("water" + (i + 1) + ".png");
+    }
 
+    // tree
     treeTrunk = loadImage("tree_trunk.png");
     treeMid = loadImage("tree_mid.png");
     treeTL = loadImage("treetop_left.png");
     treeTC = loadImage("treetop_center.png");
     treeTR = loadImage("treetop_right.png");
 
+    // bridge
     bridgeE = loadImage("bridge_e.png");
     bridgeC = loadImage("bridge_center.png");
     bridgeW = loadImage("bridge_w.png");
@@ -124,6 +133,8 @@ class Level {
     mapH = img.height;
 
     tiles = new int[mapH][mapW];
+    originalTiles = new int[mapH][mapW]; // ✅ NEW
+
     bridgeTriggered = new boolean[mapH][mapW];
     bridgeTimer = new int[mapH][mapW];
 
@@ -136,19 +147,31 @@ class Level {
       for (int x = 0; x < mapW; x++) {
         color c = img.pixels[y * mapW + x];
 
-        if (c == C_SOLID) tiles[y][x] = TILE_SOLID;
-        else if (c == C_SPAWN) tiles[y][x] = TILE_SPAWN;
-        else if (c == C_GOAL) tiles[y][x] = TILE_GOAL;
-        else if (c == C_CHECKPOINT) tiles[y][x] = TILE_CHECKPOINT;
-        else if (c == C_PORTAL) tiles[y][x] = TILE_PORTAL;
-        else if (c == C_LAVA) tiles[y][x] = TILE_LAVA;
-        else if (c == C_TRAMP) tiles[y][x] = TILE_TRAMPOLINE;
-        else if (c == C_ICE) tiles[y][x] = TILE_ICE;
-        else if (c == C_SPIKE) tiles[y][x] = TILE_SPIKE;
-        else if (c == C_TREE) tiles[y][x] = TILE_TREE;
-        else if (c == C_WATER) tiles[y][x] = TILE_WATER;
-        else if (c == C_BRIDGE) tiles[y][x] = TILE_BRIDGE;
-        else if (c == C_GOOMBA) {
+        if (c == C_SOLID) { 
+          tiles[y][x] = TILE_SOLID;
+        } else if (c == C_SPAWN) {
+          tiles[y][x] = TILE_SPAWN;
+        } else if (c == C_GOAL) {
+          tiles[y][x] = TILE_GOAL;
+        } else if (c == C_CHECKPOINT) {
+          tiles[y][x] = TILE_CHECKPOINT;
+        } else if (c == C_PORTAL) {
+          tiles[y][x] = TILE_PORTAL;
+        } else if (c == C_LAVA) {
+          tiles[y][x] = TILE_LAVA;
+        } else if (c == C_TRAMP) {
+          tiles[y][x] = TILE_TRAMPOLINE;
+        } else if (c == C_ICE) {
+          tiles[y][x] = TILE_ICE;
+        } else if (c == C_SPIKE) {
+          tiles[y][x] = TILE_SPIKE;
+        } else if (c == C_TREE) {
+          tiles[y][x] = TILE_TREE;
+        } else if (c == C_WATER) {
+          tiles[y][x] = TILE_WATER;
+        } else if (c == C_BRIDGE) {
+          tiles[y][x] = TILE_BRIDGE;
+        } else if (c == C_GOOMBA) {
           tiles[y][x] = TILE_EMPTY;
           goombaSpawns.add(new PVector(x * tileSize, y * tileSize));
         } else if (c == C_HAMMERBRO) {
@@ -160,6 +183,9 @@ class Level {
         } else {
           tiles[y][x] = TILE_EMPTY;
         }
+
+        // ✅ NEW: backup the original tile layout (bridges will restore)
+        originalTiles[y][x] = tiles[y][x];
       }
     }
   }
@@ -183,10 +209,17 @@ class Level {
       }
     }
 
-    for (PVector sp : goombaSpawns) enemies.add(new Goomba(sp.x, sp.y - 10, this));
-    for (PVector sp : hammerBroSpawns) enemies.add(new HammerBro(sp.x, sp.y - 10, this));
-    for (PVector sp : thwompSpawns) enemies.add(new Thwomp(sp.x, sp.y, this));
+    for (PVector sp : goombaSpawns) {
+      enemies.add(new Goomba(sp.x, sp.y - 10, this));
+    }
+    for (PVector sp : hammerBroSpawns) {
+      enemies.add(new HammerBro(sp.x, sp.y - 10, this));
+    }
+    for (PVector sp : thwompSpawns) {
+      enemies.add(new Thwomp(sp.x, sp.y, this));
+    }
 
+    // reset collapsing bridge arrays
     for (int y = 0; y < mapH; y++) {
       for (int x = 0; x < mapW; x++) {
         bridgeTriggered[y][x] = false;
@@ -195,74 +228,76 @@ class Level {
     }
   }
 
+  // ✅ FIXED RESET: restores the map tiles (bridges come back every retry)
   void reset() {
     cleared = false;
     checkpointX = -1;
     checkpointY = -1;
-    scanMap();
-    player = new Player(spawnX, spawnY, this);
-  }
 
-  // ===== CHECKPOINT SAVE / RESPAWN =====
-  void saveCheckpointAt(float wx, float wy) {
-    int tx = int(wx / tileSize);
-    int ty = int(wy / tileSize);
-    if (tx < 0 || ty < 0 || tx >= mapW || ty >= mapH) return;
-    if (tiles[ty][tx] != TILE_CHECKPOINT) return;
-
-    checkpointX = tx * tileSize;
-    checkpointY = ty * tileSize;
-  }
-
-  void respawnPlayer() {
-    if (checkpointX >= 0 && checkpointY >= 0) {
-      player.x = checkpointX + tileSize / 2 - player.w / 2;
-      player.y = checkpointY - player.h - 2;
-    } else {
-      player.x = spawnX;
-      player.y = spawnY;
+    // RESTORE ALL TILES from backup
+    for (int y = 0; y < mapH; y++) {
+      for (int x = 0; x < mapW; x++) {
+        tiles[y][x] = originalTiles[y][x];
+        bridgeTriggered[y][x] = false;
+        bridgeTimer[y][x] = 0;
+      }
     }
-    player.vx = 0;
-    player.vy = 0;
-    player.portalCooldown = 10;
-    player.wasInPortal = false;
+
+    // rebuild portals + enemies based on restored tiles
+    scanMap();
+
+    // respawn player
+    player = new Player(spawnX, spawnY, this);
   }
 
   // ===== UPDATE =====
   void update() {
+    // animate lava/water
     animTimer++;
     if (animTimer % 10 == 0) {
       lavaFrame = (lavaFrame + 1) % lavaFrames.length;
       waterFrame = (waterFrame + 1) % waterFrames.length;
     }
 
+    // collapsing bridge trigger: player feet tile
     int px = int((player.x + player.w / 2) / tileSize);
     int py = int((player.y + player.h + 1) / tileSize);
     if (px >= 0 && py >= 0 && px < mapW && py < mapH) {
-      if (tiles[py][px] == TILE_BRIDGE) bridgeTriggered[py][px] = true;
+      if (tiles[py][px] == TILE_BRIDGE) {
+        bridgeTriggered[py][px] = true;
+      }
     }
 
+    // collapsing bridge countdown
     for (int y = 0; y < mapH; y++) {
       for (int x = 0; x < mapW; x++) {
         if (tiles[y][x] == TILE_BRIDGE && bridgeTriggered[y][x]) {
           bridgeTimer[y][x]++;
-          if (bridgeTimer[y][x] > 30) tiles[y][x] = TILE_EMPTY;
+          if (bridgeTimer[y][x] > 30) {
+            tiles[y][x] = TILE_EMPTY; // bridge falls away
+          }
         }
       }
     }
 
     player.update();
 
-    for (Enemy e : enemies) e.update();
+    for (Enemy e : enemies) {
+      e.update();
+    }
     for (int i = enemies.size() - 1; i >= 0; i--) {
-      if (!enemies.get(i).alive) enemies.remove(i);
+      if (!enemies.get(i).alive) {
+        enemies.remove(i);
+      }
     }
   }
 
   // ===== DRAW =====
   void display() {
     drawTiles();
-    for (Enemy e : enemies) e.display();
+    for (Enemy e : enemies) {
+      e.display();
+    }
     player.display();
   }
 
@@ -284,9 +319,7 @@ class Level {
         } else if (t == TILE_GOAL) {
           image(goalTile, sx, sy, tileSize, tileSize);
         } else if (t == TILE_CHECKPOINT) {
-          // two-state checkpoint sprite
-          boolean active = (checkpointX == sx && checkpointY == sy);
-          image(active ? checkpoint1Img : checkpoint0Img, sx, sy, tileSize, tileSize);
+          image(checkpointTile, sx, sy, tileSize, tileSize);
         } else if (t == TILE_PORTAL) {
           image(portalTile, sx, sy, tileSize, tileSize);
         } else if (t == TILE_LAVA) {
@@ -300,35 +333,44 @@ class Level {
         } else if (t == TILE_WATER) {
           image(waterFrames[waterFrame], sx, sy, tileSize, tileSize);
         } else if (t == TILE_TREE) {
+          // no collision, just draw stacked tree
           image(treeTrunk, sx, sy, tileSize, tileSize);
           image(treeMid, sx, sy - tileSize, tileSize, tileSize);
           image(treeTL, sx - tileSize, sy - 2 * tileSize, tileSize, tileSize);
           image(treeTC, sx, sy - 2 * tileSize, tileSize, tileSize);
           image(treeTR, sx + tileSize, sy - 2 * tileSize, tileSize, tileSize);
         } else if (t == TILE_BRIDGE) {
+          // draw bridge piece (pattern repeats every 3 tiles)
           int mod = x % 3;
-          if (mod == 0) image(bridgeW, sx, sy, tileSize, tileSize);
-          else if (mod == 1) image(bridgeC, sx, sy, tileSize, tileSize);
-          else image(bridgeE, sx, sy, tileSize, tileSize);
+          if (mod == 0) {
+            image(bridgeW, sx, sy, tileSize, tileSize);
+          } else if (mod == 1) {
+            image(bridgeC, sx, sy, tileSize, tileSize);
+          } else {
+            image(bridgeE, sx, sy, tileSize, tileSize);
+          }
 
+          // draw rails above bridge (decorative, no collision)
           float ry = sy - tileSize;
-          if (mod == 0) image(railW, sx, ry, tileSize, tileSize);
-          else if (mod == 1) image(railC, sx, ry, tileSize, tileSize);
-          else image(railE, sx, ry, tileSize, tileSize);
+          if (mod == 0) {
+            image(railW, sx, ry, tileSize, tileSize);
+          } else if (mod == 1) {
+            image(railC, sx, ry, tileSize, tileSize);
+          } else {
+            image(railE, sx, ry, tileSize, tileSize);
+          }
         }
       }
     }
   }
 
   // ===== QUERIES =====
-  int getWorldWidthPx() {
-    return mapW * tileSize;
-  }
-
   int getTileAt(float wx, float wy) {
     int tx = int(wx / tileSize);
     int ty = int(wy / tileSize);
-    if (tx < 0 || ty < 0 || tx >= mapW || ty >= mapH) return TILE_EMPTY;
+    if (tx < 0 || ty < 0 || tx >= mapW || ty >= mapH) {
+      return TILE_EMPTY;
+    }
     return tiles[ty][tx];
   }
 
@@ -356,10 +398,6 @@ class Level {
 
   boolean isPortal(float x, float y) {
     return getTileAt(x, y) == TILE_PORTAL;
-  }
-
-  boolean isCheckpoint(float x, float y) {
-    return getTileAt(x, y) == TILE_CHECKPOINT;
   }
 
   PVector getNextPortal(PVector current) {

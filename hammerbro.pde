@@ -58,6 +58,7 @@ class HammerBro extends Enemy {
     }
 
     updateAnimation();
+    cameraCull();
   }
 
   void updateAnimation() {
