@@ -11,13 +11,11 @@ class Player {
   boolean onGround = false;
   boolean facingRight = true;
 
-  // ===== PORTAL STATE =====
   boolean wasInPortal = false;
   int portalCooldown = 0;
 
   Level level;
 
-  // ===== ANIMATION =====
   PImage[] idleR = new PImage[2];
   PImage idleL, jumpL, jumpR;
   PImage[] runR = new PImage[3];
@@ -26,37 +24,43 @@ class Player {
   int frameDelay = 8;
   int frameCountAnim = 0;
 
+  String skin;
+
   Player(float x, float y, Level lvl) {
     this.x = x;
     this.y = y;
     this.level = lvl;
 
-    idleR[0] = loadImage("idle0.png");
-    idleR[1] = loadImage("idle1.png");
-    idleL = loadImage("idle2.png");
-    jumpR = loadImage("jump0.png");
-    jumpL = loadImage("jump1.png");
+    skin = getCharacterPrefix();
 
-    runR[0] = loadImage("runright0.png");
-    runR[1] = loadImage("runright1.png");
-    runR[2] = loadImage("runright2.png");
-
-    runL[0] = loadImage("runleft0.png");
-    runL[1] = loadImage("runleft1.png");
-    runL[2] = loadImage("runleft2.png");
-  }
-
-  // ==================================================
-  void update() {
-
-    if (portalCooldown > 0) {
-      portalCooldown--;
+    if (skin.equals("luigi")) {
+      jumpForce = -12;
+    } else if (skin.equals("toad")) {
+      speed = 3.8;
     }
 
-    // ===== ICE / MOVEMENT =====
+    idleR[0] = getImg(skin + "_idle0.png");
+    idleR[1] = getImg(skin + "_idle1.png");
+    idleL    = getImg(skin + "_idle2.png");
+
+    jumpR    = getImg(skin + "_jump0.png");
+    jumpL    = getImg(skin + "_jump1.png");
+
+    runR[0]  = getImg(skin + "_runright0.png");
+    runR[1]  = getImg(skin + "_runright1.png");
+    runR[2]  = getImg(skin + "_runright2.png");
+
+    runL[0]  = getImg(skin + "_runleft0.png");
+    runL[1]  = getImg(skin + "_runleft1.png");
+    runL[2]  = getImg(skin + "_runleft2.png");
+  }
+
+  void update() {
+    if (portalCooldown > 0) portalCooldown--;
+
     boolean onIce = level.isIce(x + w / 2, y + h + 1);
     float accel = onIce ? 0.15 : 0.5;
-    float maxSpeed = onIce ? 2.2 : 3;
+    float maxSpeed = onIce ? (speed * 0.75) : speed;
 
     if (leftKey) {
       vx = max(vx - accel, -maxSpeed);
@@ -68,13 +72,9 @@ class Player {
       vx = 0;
     }
 
-    // ===== HORIZONTAL =====
     x += vx;
-    if (colliding()) {
-      x -= vx;
-    }
+    if (colliding()) x -= vx;
 
-    // ===== VERTICAL =====
     vy += gravity;
     y += vy;
 
@@ -90,20 +90,20 @@ class Player {
       onGround = false;
     }
 
-    // ===== DEATH =====
+    // Savepoint: touching checkpoint saves it
+    if (level.isCheckpoint(x + w / 2, y + h / 2)) {
+      level.saveCheckpointAt(x + w / 2, y + h / 2);
+    }
+
+    // Tile death -> lose a life instead of instant gameover
     if (level.isDead(x + w / 2, y + h / 2)) {
-      mode = GAMEOVER;
+      killPlayer();
       return;
     }
 
-    // ===== END POINT =====
     if (level.isEndPoint(x + w / 2, y + h / 2)) {
       level.cleared = true;
     }
-
-    // ==================================================
-    // ===== PORTAL : EDGE-TRIGGER + TILE-SNAP =====
-    // ==================================================
 
     boolean inPortal =
       level.isPortal(x + 2, y + h / 2) ||
@@ -111,15 +111,11 @@ class Player {
       level.isPortal(x + w / 2, y + h / 2);
 
     if (!wasInPortal && inPortal && portalCooldown == 0) {
-
       float hx = x + w / 2;
       float hy = y + h / 2;
 
-      if (level.isPortal(x + 2, y + h / 2)) {
-        hx = x + 2;
-      } else if (level.isPortal(x + w - 2, y + h / 2)) {
-        hx = x + w - 2;
-      }
+      if (level.isPortal(x + 2, y + h / 2)) hx = x + 2;
+      else if (level.isPortal(x + w - 2, y + h / 2)) hx = x + w - 2;
 
       int tx = int(hx / level.tileSize);
       int ty = int(hy / level.tileSize);
@@ -133,7 +129,6 @@ class Player {
         vy = 0;
         portalCooldown = 15;
 
-        // ===== UNSTUCK PATCH =====
         int safety = 0;
         while (colliding() && safety < level.tileSize * 3) {
           y -= 1;
@@ -153,18 +148,16 @@ class Player {
 
     wasInPortal = inPortal;
 
-    // ===== ENEMIES =====
+    // Enemy collision -> lose a life (unless stomp)
     for (Enemy e : level.enemies) {
-      if (!e.alive) {
-        continue;
-      }
+      if (!e.alive) continue;
 
       if (e.intersects(this)) {
         if (e.stompedBy(this)) {
           e.alive = false;
           vy = jumpForce * 0.7;
         } else {
-          mode = GAMEOVER;
+          killPlayer();
           return;
         }
       }
@@ -173,7 +166,6 @@ class Player {
     updateAnimation();
   }
 
-  // ==================================================
   void updateAnimation() {
     frameCountAnim++;
     if (frameCountAnim >= frameDelay) {
@@ -199,27 +191,14 @@ class Player {
   }
 
   void jump() {
-    if (onGround) {
-      vy = jumpForce;
-    }
+    if (onGround) vy = jumpForce;
   }
 
-  // ==================================================
-  // Solid collision, but portal tiles are NOT solid
-  // ==================================================
   boolean colliding() {
-
-    // ---- World boundary (invisible wall) ----
-    if (x < camX || x + w > camX + width) {
-      return true;
-    }
-
-    // ---- Solid tiles (ignore portal tiles) ----
     boolean tl = level.isSolid(x, y) && !level.isPortal(x, y);
     boolean tr = level.isSolid(x + w - 1, y) && !level.isPortal(x + w - 1, y);
     boolean bl = level.isSolid(x, y + h - 1) && !level.isPortal(x, y + h - 1);
     boolean br = level.isSolid(x + w - 1, y + h - 1) && !level.isPortal(x + w - 1, y + h - 1);
-
     return tl || tr || bl || br;
   }
 }

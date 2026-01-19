@@ -1,26 +1,6 @@
 // Mario Game
 
-//Notes 1.12:
-/*
-Quests+Storylines:
-- 1 character interaction
--> similar to enemies
-- like finding lost dog
--> similar to hopping Goomba
-- Collect in character backpack? or attach to player image?
-
-Switchblocks:
-- lever
--> reverse image+change color
-- door open close
-- sensor 
--> 2 for loops
--> if statements
-- coud link this to quests+storylines
-
-*/
-
-// Shared images (used by enemies)
+// ================== Shared images (enemies) ==================
 PImage hammerSharedImage;
 PImage[] goombaSharedFrames;
 
@@ -29,9 +9,40 @@ PImage thwompMovingSharedImage;
 
 PImage[] hammerBroSharedFrames;
 
+// ================== Camera ==================
 float camX = 0;
 
-// ---------------- MODES ----------------
+// ================== Character image cache ==================
+import java.util.HashMap;
+
+HashMap<String, PImage> imgCache = new HashMap<String, PImage>();
+
+PImage getImg(String filename) {
+  PImage img = imgCache.get(filename);
+  if (img == null) {
+    img = loadImage(filename);
+    imgCache.put(filename, img);
+  }
+  return img;
+}
+
+// 0 = mario, 1 = luigi, 2 = toad
+String getCharacterPrefix() {
+  if (selectedCharacter == 1) return "luigi";
+  if (selectedCharacter == 2) return "toad";
+  return "mario";
+}
+
+// ================== Character tuning (optional) ==================
+final float MARIO_SPEED = 3;
+final float LUIGI_JUMP = -12;
+final float TOAD_SPEED = 4.5;
+
+// ================== Lives ==================
+final int MAX_LIVES = 3;
+int lives = MAX_LIVES;
+
+// ================== Modes ==================
 final int INTRO = 0;
 final int GAME = 1;
 final int PAUSE = 2;
@@ -39,19 +50,19 @@ final int GAMEOVER = 3;
 
 int mode = INTRO;
 
-// ---------------- LEVEL SYSTEM ----------------
+// ================== Level system ==================
 Level[] levels;
 int currentLevel = 0;
 
-// ---------------- CHARACTER SELECT ----------------
+// ================== Character select ==================
 int selectedCharacter = -1;
 Button charBtn1, charBtn2, charBtn3, startBtn;
 
-// ---------------- UI ----------------
+// ================== UI ==================
 Button nextLevelBtn;
 Button restartBtn;
 
-// ---------------- INPUT ----------------
+// ================== Input ==================
 boolean leftKey, rightKey;
 
 // ==================================================
@@ -77,7 +88,7 @@ void setup() {
 }
 
 // ==================================================
-// DRAW (Important: resetMatrix call)
+// DRAW
 // ==================================================
 void draw() {
   resetMatrix();
@@ -125,27 +136,50 @@ void introScreen() {
 
   stroke(255, 0, 0);
   noFill();
-  if (selectedCharacter == 0) {
-    rect(charBtn1.x, charBtn1.y, charBtn1.w, charBtn1.h, 10);
-  }
-  if (selectedCharacter == 1) {
-    rect(charBtn2.x, charBtn2.y, charBtn2.w, charBtn2.h, 10);
-  }
-  if (selectedCharacter == 2) {
-    rect(charBtn3.x, charBtn3.y, charBtn3.w, charBtn3.h, 10);
-  }
+  if (selectedCharacter == 0) rect(charBtn1.x, charBtn1.y, charBtn1.w, charBtn1.h, 10);
+  if (selectedCharacter == 1) rect(charBtn2.x, charBtn2.y, charBtn2.w, charBtn2.h, 10);
+  if (selectedCharacter == 2) rect(charBtn3.x, charBtn3.y, charBtn3.w, charBtn3.h, 10);
   noStroke();
 
   if (selectedCharacter != -1) {
     startBtn.display();
     if (startBtn.isClicked()) {
       currentLevel = 0;
+      lives = MAX_LIVES;
       camX = 0;
+
       levels[currentLevel].reset();
+      syncCameraToPlayer(levels[currentLevel]);
+
       mode = GAME;
       delay(200);
     }
   }
+}
+
+// ==================================================
+// KILL / RESPAWN
+// ==================================================
+void killPlayer() {
+  if (mode != GAME) return;
+
+  lives--;
+
+  if (lives <= 0) {
+    mode = GAMEOVER;
+    return;
+  }
+
+  Level lvl = levels[currentLevel];
+  lvl.respawnPlayer();
+  syncCameraToPlayer(lvl);
+}
+
+void syncCameraToPlayer(Level lvl) {
+  float playerCenterX = lvl.player.x + lvl.player.w / 2.0;
+  float targetCamX = playerCenterX - width * 0.5;
+  float maxCamX = max(0, lvl.getWorldWidthPx() - width);
+  camX = constrain(targetCamX, 0, maxCamX);
 }
 
 // ==================================================
@@ -156,14 +190,11 @@ void gameScreen() {
 
   Level lvl = levels[currentLevel];
 
-  // -------- CAMERA FOLLOW --------
+  // -------- CAMERA FOLLOW (free left/right) --------
   float playerCenterX = lvl.player.x + lvl.player.w / 2;
-  float pushLine = camX + width * 0.6;
-
-  if (playerCenterX > pushLine) {
-    camX = playerCenterX - width * 0.6;
-  }
-  camX = max(camX, 0);
+  float targetCamX = playerCenterX - width * 0.5;
+  float maxCamX = max(0, lvl.getWorldWidthPx() - width);
+  camX = constrain(targetCamX, 0, maxCamX);
 
   // -------- WORLD --------
   pushMatrix();
@@ -176,6 +207,9 @@ void gameScreen() {
 
   // -------- UI --------
   fill(0);
+  textAlign(LEFT);
+  text("Lives: " + lives, 12, 28);
+
   textAlign(CENTER);
   text("LEVEL " + lvl.id, width / 2, 30);
   text("Press SPACE to Pause", width / 2, 55);
@@ -192,6 +226,7 @@ void gameScreen() {
         currentLevel++;
         camX = 0;
         levels[currentLevel].reset();
+        syncCameraToPlayer(levels[currentLevel]);
         delay(200);
       }
     } else {
@@ -210,8 +245,6 @@ void gameScreen() {
 // PAUSE
 // ==================================================
 void pauseScreen() {
-  camX = 0;
-
   background(0, 160);
   fill(255);
   textAlign(CENTER);
@@ -251,12 +284,8 @@ void gameOverScreen() {
 // INPUT
 // ==================================================
 void keyPressed() {
-  if (key == 'a' || key == 'A' || keyCode == LEFT) {
-    leftKey = true;
-  }
-  if (key == 'd' || key == 'D' || keyCode == RIGHT) {
-    rightKey = true;
-  }
+  if (key == 'a' || key == 'A' || keyCode == LEFT) leftKey = true;
+  if (key == 'd' || key == 'D' || keyCode == RIGHT) rightKey = true;
 
   if ((key == 'w' || key == 'W' || keyCode == UP) && mode == GAME) {
     levels[currentLevel].player.jump();
@@ -264,10 +293,6 @@ void keyPressed() {
 }
 
 void keyReleased() {
-  if (key == 'a' || key == 'A' || keyCode == LEFT) {
-    leftKey = false;
-  }
-  if (key == 'd' || key == 'D' || keyCode == RIGHT) {
-    rightKey = false;
-  }
+  if (key == 'a' || key == 'A' || keyCode == LEFT) leftKey = false;
+  if (key == 'd' || key == 'D' || keyCode == RIGHT) rightKey = false;
 }

@@ -1,5 +1,4 @@
 class Hammer {
-  // No static here – we use global hammerSharedImage instead
 
   float x, y;
   float w = 14;
@@ -19,7 +18,6 @@ class Hammer {
     this.vy = vy;
     this.level = lvl;
 
-    // Lazy-load the shared hammer image using the global variable
     if (hammerSharedImage == null) {
       hammerSharedImage = loadImage("hammer.png");
     }
@@ -29,12 +27,10 @@ class Hammer {
   void update() {
     if (!alive) return;
 
-    // Physics
     vy += gravity;
     x += vx;
     y += vy;
 
-    // Hit solid tiles
     if (level.isSolid(x, y) ||
         level.isSolid(x + w - 1, y) ||
         level.isSolid(x, y + h - 1) ||
@@ -43,14 +39,13 @@ class Hammer {
       return;
     }
 
-    // Hit player
+    // Hit player -> lose a life
     if (hits(level.player)) {
-      mode = GAMEOVER;
+      killPlayer();
       alive = false;
       return;
     }
 
-    // Off-screen cleanup
     if (x + w < camX || x > camX + width + 50) {
       alive = false;
     }

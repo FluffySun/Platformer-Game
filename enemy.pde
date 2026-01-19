@@ -29,10 +29,4 @@ abstract class Enemy {
     boolean crossedTop = (pBottomPrev <= y) && (pBottomNow >= y);
     return falling && withinX && crossedTop;
   }
-
-  void cameraCull() {
-    if (x + w < camX - 50) {
-      alive = false;
-    }
-  }
 }

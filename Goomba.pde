@@ -42,7 +42,6 @@ class Goomba extends Enemy {
     }
 
     updateAnimation();
-    cameraCull();
   }
 
   void updateAnimation() {
